@@ -1,8 +1,13 @@
 <div class="layout">
   <aside class="sidebar">
     <div class="sidebar-header">
-      <h1>📝 Notas</h1>
-      <button class="new-note-btn" (click)="createNote()">+ Nueva</button>
+      <div class="brand">
+        <div class="brand-icon">✦</div>
+        <h1>Notas</h1>
+      </div>
+      <button class="new-note-btn" (click)="createNote()">
+        <span>+</span> Nueva
+      </button>
     </div>
     <app-search-bar (search)="onSearch($event)" />
     <app-tag-manager

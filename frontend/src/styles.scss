@@ -1,8 +1,42 @@
-*, *::before, *::after { box-sizing: border-box; }
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --bg: #0d0d11;
+  --surface: #13131a;
+  --surface-2: #1a1a24;
+  --surface-3: #22222f;
+  --border: rgba(255, 255, 255, 0.06);
+  --border-hover: rgba(139, 92, 246, 0.4);
+  --accent: #8b5cf6;
+  --accent-2: #6366f1;
+  --accent-glow: rgba(139, 92, 246, 0.25);
+  --text-primary: #f1f0ff;
+  --text-secondary: #8880a8;
+  --text-muted: #4d4866;
+  --red: #f87171;
+  --red-bg: rgba(248, 113, 113, 0.1);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
 
 body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: #fff;
-  color: #111827;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--surface-3);
+  border-radius: 99px;
 }
