@@ -1,0 +1,27 @@
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h1>📝 Notas</h1>
+      <button class="new-note-btn" (click)="createNote()">+ Nueva</button>
+    </div>
+    <app-search-bar (search)="onSearch($event)" />
+    <app-tag-manager
+      [tags]="tags"
+      (tagSelected)="onTagFilter($event)"
+      (tagsChanged)="loadTags()"
+    />
+    <app-note-list
+      [notes]="notes"
+      [selectedId]="selectedNote?._id ?? null"
+      (select)="selectedNote = $event"
+    />
+  </aside>
+  <main class="main">
+    <app-note-editor
+      [note]="selectedNote"
+      [availableTags]="tags"
+      (saved)="onNoteSaved($event)"
+      (deleted)="onNoteDeleted($event)"
+    />
+  </main>
+</div>
