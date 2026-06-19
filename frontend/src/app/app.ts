@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Note } from './models/note.model';
 import { Tag } from './models/tag.model';
@@ -17,9 +17,10 @@ import { SearchBarComponent } from './components/search-bar/search-bar';
   styleUrl: './app.scss',
 })
 export class App implements OnInit {
-  notes: Note[] = [];
-  tags: Tag[] = [];
-  selectedNote: Note | null = null;
+  notes = signal<Note[]>([]);
+  tags = signal<Tag[]>([]);
+  selectedNote = signal<Note | null>(null);
+
   private searchQuery = '';
   private activeTag: string | null = null;
 
@@ -31,18 +32,19 @@ export class App implements OnInit {
   }
 
   loadNotes() {
-    this.noteService.getNotes(this.searchQuery || undefined, this.activeTag || undefined)
-      .subscribe(notes => this.notes = notes);
+    this.noteService
+      .getNotes(this.searchQuery || undefined, this.activeTag || undefined)
+      .subscribe(notes => this.notes.set(notes));
   }
 
   loadTags() {
-    this.tagService.getTags().subscribe(tags => this.tags = tags);
+    this.tagService.getTags().subscribe(tags => this.tags.set(tags));
   }
 
   createNote() {
     this.noteService.createNote({ title: 'Nueva nota', content: '' }).subscribe(note => {
-      this.notes = [note, ...this.notes];
-      this.selectedNote = note;
+      this.notes.update(prev => [note, ...prev]);
+      this.selectedNote.set(note);
     });
   }
 
@@ -57,12 +59,12 @@ export class App implements OnInit {
   }
 
   onNoteSaved(updated: Note) {
-    this.notes = this.notes.map(n => n._id === updated._id ? updated : n);
-    this.selectedNote = updated;
+    this.notes.update(prev => prev.map(n => n._id === updated._id ? updated : n));
+    this.selectedNote.set(updated);
   }
 
   onNoteDeleted(id: string) {
-    this.notes = this.notes.filter(n => n._id !== id);
-    this.selectedNote = null;
+    this.notes.update(prev => prev.filter(n => n._id !== id));
+    this.selectedNote.set(null);
   }
 }

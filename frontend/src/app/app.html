@@ -11,20 +11,20 @@
     </div>
     <app-search-bar (search)="onSearch($event)" />
     <app-tag-manager
-      [tags]="tags"
+      [tags]="tags()"
       (tagSelected)="onTagFilter($event)"
       (tagsChanged)="loadTags()"
     />
     <app-note-list
-      [notes]="notes"
-      [selectedId]="selectedNote?._id ?? null"
-      (select)="selectedNote = $event"
+      [notes]="notes()"
+      [selectedId]="selectedNote()?._id ?? null"
+      (select)="selectedNote.set($event)"
     />
   </aside>
   <main class="main">
     <app-note-editor
-      [note]="selectedNote"
-      [availableTags]="tags"
+      [note]="selectedNote()"
+      [availableTags]="tags()"
       (saved)="onNoteSaved($event)"
       (deleted)="onNoteDeleted($event)"
     />
