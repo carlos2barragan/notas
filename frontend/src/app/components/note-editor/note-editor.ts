@@ -1,6 +1,6 @@
 import {
   Component, ElementRef, EventEmitter, HostListener, Input,
-  OnChanges, Output, SimpleChanges, ViewChild
+  OnChanges, OnDestroy, Output, SimpleChanges, ViewChild, signal
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -24,32 +24,58 @@ import { UploadService } from '../../services/upload.service';
     >
       <!-- Topbar -->
       <div class="editor-topbar">
-        <span class="last-saved">{{ note.updatedAt | date:'d MMM y · HH:mm' }}</span>
-        <div class="actions">
-          <button class="action-btn" (click)="fileInput.click()" title="Adjuntar imagen o video">
+
+        <!-- Estado normal -->
+        <ng-container *ngIf="!isRecording()">
+          <span class="last-saved">{{ note.updatedAt | date:'d MMM y · HH:mm' }}</span>
+          <div class="actions">
+            <button class="action-btn" (click)="fileInput.click()" title="Adjuntar imagen">
+              <svg viewBox="0 0 20 20" fill="none">
+                <rect x="2" y="4" width="16" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/>
+                <circle cx="7" cy="8.5" r="1.5" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M2 14l4-4 3 3 3-3 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <button class="action-btn" (click)="videoInput.click()" title="Adjuntar video">
+              <svg viewBox="0 0 20 20" fill="none">
+                <rect x="2" y="5" width="11" height="10" rx="2" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M13 8.5l5-2.5v7l-5-2.5V8.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <button class="action-btn mic-btn" (click)="startRecording()" title="Grabar nota de voz">
+              <svg viewBox="0 0 20 20" fill="none">
+                <rect x="7" y="2" width="6" height="10" rx="3" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M4 10a6 6 0 0012 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                <path d="M10 16v2M8 18h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+            </button>
+            <button class="action-btn pin-btn" [class.active]="note.isPinned" (click)="togglePin()" title="Anclar nota">
+              <svg viewBox="0 0 20 20" fill="none">
+                <path d="M10 2v9m-4 0l4 7 4-7M6 11H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <button class="action-btn delete-btn" (click)="deleteNote()" title="Eliminar nota">
+              <svg viewBox="0 0 20 20" fill="none">
+                <path d="M5 6h10M8 6V4h4v2M9 10v5M11 10v5M6 6l.7 10.3A1 1 0 007.7 17h4.6a1 1 0 001-.7L14 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+          </div>
+        </ng-container>
+
+        <!-- Estado grabando -->
+        <ng-container *ngIf="isRecording()">
+          <div class="recording-bar">
+            <span class="rec-dot"></span>
+            <span class="rec-label">Grabando</span>
+            <span class="rec-time">{{ formatTime(recordingSeconds()) }}</span>
+          </div>
+          <button class="stop-rec-btn" (click)="stopRecording()">
             <svg viewBox="0 0 20 20" fill="none">
-              <rect x="2" y="4" width="16" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/>
-              <circle cx="7" cy="8.5" r="1.5" stroke="currentColor" stroke-width="1.5"/>
-              <path d="M2 14l4-4 3 3 3-3 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <rect x="5" y="5" width="10" height="10" rx="2" fill="currentColor"/>
             </svg>
+            Detener
           </button>
-          <button class="action-btn" (click)="videoInput.click()" title="Adjuntar video">
-            <svg viewBox="0 0 20 20" fill="none">
-              <rect x="2" y="5" width="11" height="10" rx="2" stroke="currentColor" stroke-width="1.5"/>
-              <path d="M13 8.5l5-2.5v7l-5-2.5V8.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-            </svg>
-          </button>
-          <button class="action-btn pin-btn" [class.active]="note.isPinned" (click)="togglePin()" title="Anclar nota">
-            <svg viewBox="0 0 20 20" fill="none">
-              <path d="M10 2v9m-4 0l4 7 4-7M6 11H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </button>
-          <button class="action-btn delete-btn" (click)="deleteNote()" title="Eliminar nota">
-            <svg viewBox="0 0 20 20" fill="none">
-              <path d="M5 6h10M8 6V4h4v2M9 10v5M11 10v5M6 6l.7 10.3A1 1 0 007.7 17h4.6a1 1 0 001-.7L14 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </button>
-        </div>
+        </ng-container>
       </div>
 
       <!-- Inputs ocultos -->
@@ -82,13 +108,13 @@ import { UploadService } from '../../services/upload.service';
           (blur)="save()"
         ></textarea>
 
-        <!-- Upload progress -->
+        <!-- Subiendo -->
         <div class="upload-progress" *ngIf="uploading">
           <div class="spinner"></div>
           <span>Subiendo archivo...</span>
         </div>
 
-        <!-- Media gallery -->
+        <!-- Galería -->
         <div class="media-gallery" *ngIf="media.length > 0">
           <div class="gallery-label">
             <svg viewBox="0 0 16 16" fill="none">
@@ -99,19 +125,36 @@ import { UploadService } from '../../services/upload.service';
             Archivos adjuntos ({{ media.length }})
           </div>
           <div class="gallery-grid">
-            <div class="media-item" *ngFor="let item of media; let i = index">
-
+            <div
+              class="media-item"
+              *ngFor="let item of media; let i = index"
+              [class.media-item--audio]="item.type === 'audio'"
+            >
+              <!-- Imagen -->
               <ng-container *ngIf="item.type === 'image'">
-                <img
-                  [src]="item.url"
-                  [alt]="item.name"
-                  class="media-img"
-                  (click)="openLightbox(item)"
-                />
+                <img [src]="item.url" [alt]="item.name" class="media-img" (click)="openLightbox(item)" />
               </ng-container>
 
+              <!-- Video -->
               <ng-container *ngIf="item.type === 'video'">
                 <video class="media-video" controls [src]="item.url" preload="metadata"></video>
+              </ng-container>
+
+              <!-- Audio -->
+              <ng-container *ngIf="item.type === 'audio'">
+                <div class="audio-card">
+                  <div class="audio-icon">
+                    <svg viewBox="0 0 24 24" fill="none">
+                      <rect x="9" y="2" width="6" height="12" rx="3" stroke="currentColor" stroke-width="1.5"/>
+                      <path d="M5 11a7 7 0 0014 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                      <path d="M12 18v3M10 21h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    </svg>
+                  </div>
+                  <div class="audio-content">
+                    <span class="audio-name">{{ item.name }}</span>
+                    <audio controls [src]="item.url" preload="metadata"></audio>
+                  </div>
+                </div>
               </ng-container>
 
               <button class="remove-media" (click)="removeMedia(i)" title="Eliminar">
@@ -119,11 +162,10 @@ import { UploadService } from '../../services/upload.service';
                   <path d="M2 2l8 8M10 2L2 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
                 </svg>
               </button>
-              <div class="media-name">{{ item.name }}</div>
+              <div class="media-name" *ngIf="item.type !== 'audio'">{{ item.name }}</div>
             </div>
           </div>
         </div>
-
       </div>
 
       <!-- Drag overlay -->
@@ -165,7 +207,6 @@ import { UploadService } from '../../services/upload.service';
       height: 100%;
       width: 100%;
       position: relative;
-      transition: background 0.2s;
 
       &.drag-over .editor-body { opacity: 0.3; pointer-events: none; }
     }
@@ -179,6 +220,7 @@ import { UploadService } from '../../services/upload.service';
       border-bottom: 1px solid var(--border);
       background: var(--surface);
       flex-shrink: 0;
+      min-height: 56px;
     }
 
     .last-saved { font-size: 0.75rem; color: var(--text-muted); }
@@ -200,10 +242,12 @@ import { UploadService } from '../../services/upload.service';
 
       svg { width: 16px; height: 16px; }
 
-      &:hover {
-        border-color: var(--border-hover);
-        background: var(--surface-3);
-        color: var(--text-primary);
+      &:hover { border-color: var(--border-hover); background: var(--surface-3); color: var(--text-primary); }
+
+      &.mic-btn:hover {
+        border-color: rgba(239, 68, 68, 0.4);
+        background: rgba(239, 68, 68, 0.08);
+        color: #ef4444;
       }
 
       &.pin-btn.active {
@@ -217,6 +261,60 @@ import { UploadService } from '../../services/upload.service';
         background: var(--red-bg);
         color: var(--red);
       }
+    }
+
+    /* ── Recording bar ── */
+    .recording-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    .rec-dot {
+      width: 8px;
+      height: 8px;
+      background: #ef4444;
+      border-radius: 50%;
+      animation: pulse-dot 1.2s ease-in-out infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.75); }
+    }
+
+    .rec-label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #ef4444;
+    }
+
+    .rec-time {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.03em;
+    }
+
+    .stop-rec-btn {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.4rem 0.9rem;
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      border-radius: 9px;
+      color: #ef4444;
+      font-size: 0.82rem;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.18s ease;
+
+      svg { width: 14px; height: 14px; }
+      &:hover { background: rgba(239, 68, 68, 0.2); }
     }
 
     /* ── Body ── */
@@ -241,7 +339,6 @@ import { UploadService } from '../../services/upload.service';
       letter-spacing: -0.03em;
       line-height: 1.2;
       width: 100%;
-
       &::placeholder { color: var(--text-muted); }
     }
 
@@ -263,13 +360,11 @@ import { UploadService } from '../../services/upload.service';
       user-select: none;
 
       &:hover { color: var(--text-secondary); border-color: rgba(255,255,255,0.1); }
-
       &.active {
         background: color-mix(in srgb, var(--tag-color) 15%, transparent);
         border-color: color-mix(in srgb, var(--tag-color) 50%, transparent);
         color: var(--tag-color);
       }
-
       .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; transition: background 0.18s; }
     }
 
@@ -283,10 +378,8 @@ import { UploadService } from '../../services/upload.service';
       outline: none;
       font-size: 0.95rem;
       font-family: inherit;
-      font-weight: 400;
       color: var(--text-secondary);
       line-height: 1.8;
-
       &::placeholder { color: var(--text-muted); }
     }
 
@@ -316,11 +409,7 @@ import { UploadService } from '../../services/upload.service';
     @keyframes spin { to { transform: rotate(360deg); } }
 
     /* ── Media gallery ── */
-    .media-gallery {
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-    }
+    .media-gallery { display: flex; flex-direction: column; gap: 0.75rem; }
 
     .gallery-label {
       display: flex;
@@ -331,7 +420,6 @@ import { UploadService } from '../../services/upload.service';
       text-transform: uppercase;
       letter-spacing: 0.07em;
       color: var(--text-muted);
-
       svg { width: 14px; height: 14px; }
     }
 
@@ -347,10 +435,15 @@ import { UploadService } from '../../services/upload.service';
       overflow: hidden;
       border: 1px solid var(--border);
       background: var(--surface-2);
-      group: true;
 
       &:hover .remove-media { opacity: 1; }
       &:hover .media-name { opacity: 1; }
+
+      &--audio {
+        grid-column: 1 / -1;
+        border-radius: 12px;
+        overflow: hidden;
+      }
     }
 
     .media-img {
@@ -360,16 +453,61 @@ import { UploadService } from '../../services/upload.service';
       display: block;
       cursor: zoom-in;
       transition: transform 0.25s ease;
-
       &:hover { transform: scale(1.03); }
     }
 
     .media-video {
       width: 100%;
       display: block;
-      border-radius: 0;
       max-height: 220px;
       background: #000;
+    }
+
+    /* ── Audio card ── */
+    .audio-card {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 0.9rem 1rem;
+      background: var(--surface-2);
+    }
+
+    .audio-icon {
+      width: 40px;
+      height: 40px;
+      background: rgba(139, 92, 246, 0.12);
+      border: 1px solid rgba(139, 92, 246, 0.25);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      color: var(--accent);
+
+      svg { width: 20px; height: 20px; }
+    }
+
+    .audio-content {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .audio-name {
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    audio {
+      width: 100%;
+      height: 32px;
+      accent-color: var(--accent);
     }
 
     .remove-media {
@@ -388,7 +526,6 @@ import { UploadService } from '../../services/upload.service';
       opacity: 0;
       transition: opacity 0.18s, background 0.18s;
       color: #fff;
-
       svg { width: 10px; height: 10px; }
       &:hover { background: rgba(248, 113, 113, 0.85); }
     }
@@ -415,7 +552,6 @@ import { UploadService } from '../../services/upload.service';
       inset: 0;
       background: rgba(139, 92, 246, 0.08);
       border: 2px dashed rgba(139, 92, 246, 0.5);
-      border-radius: 0;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -429,28 +565,21 @@ import { UploadService } from '../../services/upload.service';
       align-items: center;
       gap: 0.75rem;
       color: var(--accent);
-
       svg { width: 40px; height: 40px; }
-
-      span {
-        font-size: 1rem;
-        font-weight: 600;
-        letter-spacing: -0.01em;
-      }
+      span { font-size: 1rem; font-weight: 600; }
     }
 
     /* ── Lightbox ── */
     .lightbox {
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.92);
+      background: rgba(0,0,0,0.92);
       display: flex;
       align-items: center;
       justify-content: center;
       z-index: 1000;
       padding: 2rem;
       cursor: zoom-out;
-
       img {
         max-width: 90vw;
         max-height: 90vh;
@@ -476,7 +605,6 @@ import { UploadService } from '../../services/upload.service';
       justify-content: center;
       color: #fff;
       transition: background 0.18s;
-
       svg { width: 16px; height: 16px; }
       &:hover { background: rgba(255,255,255,0.2); }
     }
@@ -500,18 +628,12 @@ import { UploadService } from '../../services/upload.service';
         margin-bottom: 0.5rem;
       }
 
-      h2 {
-        font-size: 1.1rem;
-        font-weight: 600;
-        color: var(--text-secondary);
-        letter-spacing: -0.02em;
-      }
-
+      h2 { font-size: 1.1rem; font-weight: 600; color: var(--text-secondary); letter-spacing: -0.02em; }
       p { font-size: 0.82rem; color: var(--text-muted); }
     }
   `]
 })
-export class NoteEditorComponent implements OnChanges {
+export class NoteEditorComponent implements OnChanges, OnDestroy {
   @Input() note: Note | null = null;
   @Input() availableTags: Tag[] = [];
   @Output() saved = new EventEmitter<Note>();
@@ -528,6 +650,14 @@ export class NoteEditorComponent implements OnChanges {
   isDragging = false;
   lightboxItem: MediaItem | null = null;
 
+  isRecording = signal(false);
+  recordingSeconds = signal(0);
+
+  private mediaRecorder: MediaRecorder | null = null;
+  private audioChunks: Blob[] = [];
+  private audioStream: MediaStream | null = null;
+  private timerInterval: ReturnType<typeof setInterval> | null = null;
+
   constructor(
     private noteService: NoteService,
     private uploadService: UploadService,
@@ -541,6 +671,67 @@ export class NoteEditorComponent implements OnChanges {
       this.media = [...(this.note.media ?? [])];
     }
   }
+
+  ngOnDestroy() {
+    this.stopRecording();
+  }
+
+  /* ── Voz ── */
+
+  startRecording() {
+    navigator.mediaDevices.getUserMedia({ audio: true, video: false }).then(stream => {
+      this.audioStream = stream;
+
+      const mimeType = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/ogg', 'audio/mp4']
+        .find(t => MediaRecorder.isTypeSupported(t)) ?? '';
+
+      this.mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+      this.audioChunks = [];
+
+      this.mediaRecorder.ondataavailable = e => {
+        if (e.data.size > 0) this.audioChunks.push(e.data);
+      };
+
+      this.mediaRecorder.onstop = () => {
+        const blob = new Blob(this.audioChunks, { type: this.mediaRecorder!.mimeType || 'audio/webm' });
+        const ext = blob.type.includes('ogg') ? 'ogg' : blob.type.includes('mp4') ? 'mp4' : 'webm';
+        const file = new File([blob], `nota-voz-${Date.now()}.${ext}`, { type: blob.type });
+        this.uploadFiles([file]);
+        this.releaseStream();
+      };
+
+      this.mediaRecorder.start(100);
+      this.isRecording.set(true);
+      this.recordingSeconds.set(0);
+      this.timerInterval = setInterval(() => this.recordingSeconds.update(s => s + 1), 1000);
+    }).catch(() => {
+      /* permiso denegado o mic no disponible */
+    });
+  }
+
+  stopRecording() {
+    if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+      this.mediaRecorder.stop();
+    }
+    this.isRecording.set(false);
+    if (this.timerInterval) {
+      clearInterval(this.timerInterval);
+      this.timerInterval = null;
+    }
+  }
+
+  formatTime(seconds: number): string {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  }
+
+  private releaseStream() {
+    this.audioStream?.getTracks().forEach(t => t.stop());
+    this.audioStream = null;
+  }
+
+  /* ── Tags / Save / Delete ── */
 
   isTagActive(id: string) { return this.selectedTagIds.includes(id); }
 
@@ -572,6 +763,8 @@ export class NoteEditorComponent implements OnChanges {
     this.noteService.deleteNote(this.note._id).subscribe(() => this.deleted.emit(this.note!._id));
   }
 
+  /* ── Archivos ── */
+
   @HostListener('window:paste', ['$event'])
   onPaste(event: ClipboardEvent) {
     if (!this.note) return;
@@ -579,10 +772,7 @@ export class NoteEditorComponent implements OnChanges {
       .filter(item => item.kind === 'file' && /^(image|video)\//.test(item.type))
       .map(item => item.getAsFile())
       .filter((f): f is File => f !== null);
-    if (files.length) {
-      event.preventDefault();
-      this.uploadFiles(files);
-    }
+    if (files.length) { event.preventDefault(); this.uploadFiles(files); }
   }
 
   onFilePicked(event: Event) {
@@ -591,37 +781,26 @@ export class NoteEditorComponent implements OnChanges {
     (event.target as HTMLInputElement).value = '';
   }
 
-  onDragOver(event: DragEvent) {
-    event.preventDefault();
-    this.isDragging = true;
-  }
-
+  onDragOver(event: DragEvent) { event.preventDefault(); this.isDragging = true; }
   onDragLeave() { this.isDragging = false; }
 
   onDrop(event: DragEvent) {
     event.preventDefault();
     this.isDragging = false;
-    const files = Array.from(event.dataTransfer?.files ?? []).filter(f =>
-      /^(image|video)\//.test(f.type)
-    );
+    const files = Array.from(event.dataTransfer?.files ?? []).filter(f => /^(image|video)\//.test(f.type));
     if (files.length) this.uploadFiles(files);
   }
 
   private uploadFiles(files: File[]) {
     this.uploading = true;
     let pending = files.length;
-
     files.forEach(file => {
       this.uploadService.upload(file).subscribe({
         next: item => {
           this.media = [...this.media, item];
-          pending--;
-          if (pending === 0) { this.uploading = false; this.save(); }
+          if (--pending === 0) { this.uploading = false; this.save(); }
         },
-        error: () => {
-          pending--;
-          if (pending === 0) this.uploading = false;
-        },
+        error: () => { if (--pending === 0) this.uploading = false; },
       });
     });
   }

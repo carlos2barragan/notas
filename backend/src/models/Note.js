@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const mediaSchema = new mongoose.Schema({
   url: { type: String, required: true },
-  type: { type: String, enum: ['image', 'video'], required: true },
+  type: { type: String, enum: ['image', 'video', 'audio'], required: true },
   name: { type: String, default: '' },
 }, { _id: false });
 

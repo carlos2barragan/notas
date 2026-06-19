@@ -2,7 +2,7 @@ import { Tag } from './tag.model';
 
 export interface MediaItem {
   url: string;
-  type: 'image' | 'video';
+  type: 'image' | 'video' | 'audio';
   name: string;
 }
 
