@@ -1,5 +1,5 @@
 import {
-  Component, ElementRef, EventEmitter, Input,
+  Component, ElementRef, EventEmitter, HostListener, Input,
   OnChanges, Output, SimpleChanges, ViewChild
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
@@ -124,14 +124,6 @@ import { UploadService } from '../../services/upload.service';
           </div>
         </div>
 
-        <!-- Drop zone hint -->
-        <div class="drop-hint" *ngIf="media.length === 0 && !uploading">
-          <svg viewBox="0 0 20 20" fill="none">
-            <path d="M10 3v10M6 7l4-4 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M3 15h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-          </svg>
-          Arrastra imágenes o videos aquí
-        </div>
       </div>
 
       <!-- Drag overlay -->
@@ -417,18 +409,6 @@ import { UploadService } from '../../services/upload.service';
       transition: opacity 0.18s;
     }
 
-    /* ── Drop hint ── */
-    .drop-hint {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      color: var(--text-muted);
-      font-size: 0.8rem;
-      padding: 0.5rem 0;
-
-      svg { width: 16px; height: 16px; opacity: 0.5; }
-    }
-
     /* ── Drag overlay ── */
     .drag-overlay {
       position: absolute;
@@ -590,6 +570,19 @@ export class NoteEditorComponent implements OnChanges {
   deleteNote() {
     if (!this.note) return;
     this.noteService.deleteNote(this.note._id).subscribe(() => this.deleted.emit(this.note!._id));
+  }
+
+  @HostListener('window:paste', ['$event'])
+  onPaste(event: ClipboardEvent) {
+    if (!this.note) return;
+    const files = Array.from(event.clipboardData?.items ?? [])
+      .filter(item => item.kind === 'file' && /^(image|video)\//.test(item.type))
+      .map(item => item.getAsFile())
+      .filter((f): f is File => f !== null);
+    if (files.length) {
+      event.preventDefault();
+      this.uploadFiles(files);
+    }
   }
 
   onFilePicked(event: Event) {
