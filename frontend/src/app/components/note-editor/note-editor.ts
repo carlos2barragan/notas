@@ -26,7 +26,7 @@ import { UploadService } from '../../services/upload.service';
       <div class="editor-topbar">
 
         <!-- Estado normal -->
-        <ng-container *ngIf="!isRecording()">
+        <ng-container *ngIf="recordingState() === 'idle'">
           <span class="last-saved">{{ note.updatedAt | date:'d MMM y · HH:mm' }}</span>
           <div class="actions">
             <button class="action-btn" (click)="fileInput.click()" title="Adjuntar imagen">
@@ -63,7 +63,7 @@ import { UploadService } from '../../services/upload.service';
         </ng-container>
 
         <!-- Estado grabando -->
-        <ng-container *ngIf="isRecording()">
+        <ng-container *ngIf="recordingState() === 'recording'">
           <div class="recording-bar">
             <span class="rec-dot"></span>
             <span class="rec-label">Grabando</span>
@@ -76,6 +76,41 @@ import { UploadService } from '../../services/upload.service';
             Detener
           </button>
         </ng-container>
+
+        <!-- Estado preview -->
+        <ng-container *ngIf="recordingState() === 'previewing'">
+          <div class="recording-bar">
+            <span class="prev-dot"></span>
+            <span class="rec-label" style="color: var(--accent)">Vista previa</span>
+            <span class="rec-time">{{ formatTime(recordingSeconds()) }}</span>
+          </div>
+          <div class="preview-actions">
+            <button class="btn-discard" (click)="discardRecording()">
+              <svg viewBox="0 0 16 16" fill="none">
+                <path d="M3 4h10M6 4V3h4v1M5 4l.5 9h5L11 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              Descartar
+            </button>
+            <button class="btn-confirm" (click)="confirmRecording()">
+              <svg viewBox="0 0 16 16" fill="none">
+                <path d="M3 8.5l3.5 3.5L13 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              Guardar
+            </button>
+          </div>
+        </ng-container>
+      </div>
+
+      <!-- Strip de preview de audio -->
+      <div class="preview-strip" *ngIf="recordingState() === 'previewing' && previewUrl()">
+        <div class="preview-icon">
+          <svg viewBox="0 0 24 24" fill="none">
+            <rect x="9" y="2" width="6" height="12" rx="3" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M5 11a7 7 0 0014 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <path d="M12 18v3M10 21h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <audio controls [src]="previewUrl()!" autoplay class="preview-audio"></audio>
       </div>
 
       <!-- Inputs ocultos -->
@@ -546,6 +581,87 @@ import { UploadService } from '../../services/upload.service';
       transition: opacity 0.18s;
     }
 
+    /* ── Preview strip ── */
+    .preview-strip {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 0.75rem 2rem;
+      background: rgba(139, 92, 246, 0.06);
+      border-bottom: 1px solid rgba(139, 92, 246, 0.15);
+      flex-shrink: 0;
+    }
+
+    .preview-icon {
+      width: 36px;
+      height: 36px;
+      background: rgba(139, 92, 246, 0.12);
+      border: 1px solid rgba(139, 92, 246, 0.25);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      color: var(--accent);
+      svg { width: 18px; height: 18px; }
+    }
+
+    .preview-audio {
+      flex: 1;
+      height: 32px;
+      accent-color: var(--accent);
+    }
+
+    .prev-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--accent);
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .preview-actions {
+      display: flex;
+      gap: 0.4rem;
+    }
+
+    .btn-discard {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.4rem 0.8rem;
+      background: transparent;
+      border: 1px solid rgba(248, 113, 113, 0.3);
+      border-radius: 8px;
+      color: var(--red);
+      font-size: 0.8rem;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.18s ease;
+      svg { width: 13px; height: 13px; }
+      &:hover { background: var(--red-bg); border-color: rgba(248, 113, 113, 0.5); }
+    }
+
+    .btn-confirm {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.4rem 0.9rem;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 0.8rem;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.18s ease;
+      box-shadow: 0 2px 10px var(--accent-glow);
+      svg { width: 13px; height: 13px; }
+      &:hover { transform: translateY(-1px); box-shadow: 0 4px 14px var(--accent-glow); }
+    }
+
     /* ── Drag overlay ── */
     .drag-overlay {
       position: absolute;
@@ -650,13 +766,15 @@ export class NoteEditorComponent implements OnChanges, OnDestroy {
   isDragging = false;
   lightboxItem: MediaItem | null = null;
 
-  isRecording = signal(false);
+  recordingState = signal<'idle' | 'recording' | 'previewing'>('idle');
   recordingSeconds = signal(0);
+  previewUrl = signal<string | null>(null);
 
   private mediaRecorder: MediaRecorder | null = null;
   private audioChunks: Blob[] = [];
   private audioStream: MediaStream | null = null;
   private timerInterval: ReturnType<typeof setInterval> | null = null;
+  private pendingFile: File | null = null;
 
   constructor(
     private noteService: NoteService,
@@ -674,6 +792,7 @@ export class NoteEditorComponent implements OnChanges, OnDestroy {
 
   ngOnDestroy() {
     this.stopRecording();
+    this.revokePreview();
   }
 
   /* ── Voz ── */
@@ -695,13 +814,15 @@ export class NoteEditorComponent implements OnChanges, OnDestroy {
       this.mediaRecorder.onstop = () => {
         const blob = new Blob(this.audioChunks, { type: this.mediaRecorder!.mimeType || 'audio/webm' });
         const ext = blob.type.includes('ogg') ? 'ogg' : blob.type.includes('mp4') ? 'mp4' : 'webm';
-        const file = new File([blob], `nota-voz-${Date.now()}.${ext}`, { type: blob.type });
-        this.uploadFiles([file]);
+        this.pendingFile = new File([blob], `nota-voz-${Date.now()}.${ext}`, { type: blob.type });
+        this.revokePreview();
+        this.previewUrl.set(URL.createObjectURL(blob));
+        this.recordingState.set('previewing');
         this.releaseStream();
       };
 
       this.mediaRecorder.start(100);
-      this.isRecording.set(true);
+      this.recordingState.set('recording');
       this.recordingSeconds.set(0);
       this.timerInterval = setInterval(() => this.recordingSeconds.update(s => s + 1), 1000);
     }).catch(() => {
@@ -713,11 +834,24 @@ export class NoteEditorComponent implements OnChanges, OnDestroy {
     if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
       this.mediaRecorder.stop();
     }
-    this.isRecording.set(false);
     if (this.timerInterval) {
       clearInterval(this.timerInterval);
       this.timerInterval = null;
     }
+  }
+
+  confirmRecording() {
+    if (!this.pendingFile) return;
+    this.uploadFiles([this.pendingFile]);
+    this.pendingFile = null;
+    this.revokePreview();
+    this.recordingState.set('idle');
+  }
+
+  discardRecording() {
+    this.pendingFile = null;
+    this.revokePreview();
+    this.recordingState.set('idle');
   }
 
   formatTime(seconds: number): string {
@@ -729,6 +863,12 @@ export class NoteEditorComponent implements OnChanges, OnDestroy {
   private releaseStream() {
     this.audioStream?.getTracks().forEach(t => t.stop());
     this.audioStream = null;
+  }
+
+  private revokePreview() {
+    const url = this.previewUrl();
+    if (url) URL.revokeObjectURL(url);
+    this.previewUrl.set(null);
   }
 
   /* ── Tags / Save / Delete ── */
